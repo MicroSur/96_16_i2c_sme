@@ -80,6 +80,7 @@ const char pid_rx217    [8]	__PIDATTR__	= { 'J','0','7','5', 1, 0, 0, 0 };
 const char pid_gen2     [8]	__PIDATTR__	= { 'J','0','5','9', 1, 0, 0, 0 };
 const char pid_iku200   [8]	__PIDATTR__	= { 'M','0','7','2', 1, 0, 0, 0 };
 const char pid_fit      [8]	__PIDATTR__	= { 'E','2','3','9', 1, 0, 0, 0 };
+const char pid_pico75   [8]	__PIDATTR__	= { 'M','0','4','1', 1, 0, 0, 0 };
 
 #define PID_SCRAMBLE 0x12345678UL
 #define MAKEPID(p) ((((p)[0])|((p)[1]<<8)|((p)[2]<<16)|((p)[3]<<24))^PID_SCRAMBLE)
@@ -119,6 +120,7 @@ const char pid_fit      [8]	__PIDATTR__	= { 'E','2','3','9', 1, 0, 0, 0 };
 #define PID_GEN2        MAKEPID(pid_gen2)
 #define PID_IKU200      MAKEPID(pid_iku200)
 #define PID_FIT         MAKEPID(pid_fit)
+#define PID_PICO75      MAKEPID(pid_pico75)
 
 #define HWV_VTCMINI	MAKEHWV(pid_vtcmini)
 #define HWV_VTWOMINI	MAKEHWV(pid_vtwomini)
@@ -152,6 +154,7 @@ const char pid_fit      [8]	__PIDATTR__	= { 'E','2','3','9', 1, 0, 0, 0 };
 #define HWV_GEN2        MAKEHWV(pid_gen2)
 #define HWV_IKU200      MAKEHWV(pid_iku200)
 #define HWV_FIT         MAKEHWV(pid_fit)
+#define HWV_PICO75      MAKEHWV(pid_pico75)
 
 //=========================================================================
 // Reset device to LDROM
@@ -276,7 +279,17 @@ __myevic__ void SetProductID()
 
 		u32Data ^= PID_SCRAMBLE;
 
-		if ( u32Data == PID_VTCMINI )
+                if ( u32Data == PID_PICO75 )
+		{
+			dfMaxHWVersion = HWV_PICO75;
+			//DFMagicNumber = 0x36;
+			BoxModel = BOX_PICO75;
+			X32Off = 1;
+                        BoxName = "Pico75";
+                        //ScrFlip = 1;
+			break;
+		}
+		else if ( u32Data == PID_VTCMINI )
 		{
 			dfMaxHWVersion = HWV_VTCMINI;
 			//DFMagicNumber = 0x36;
@@ -850,7 +863,7 @@ __myevic__ void ResetDataFlash()
 	dfPreheatTime = 10;
 	dfClick[0] = CLICK_ACTION_EDIT;
 	dfClick[1] = CLICK_ACTION_ON_OFF;
-	dfClick[2] = CLICK_ACTION_TETRIS;
+	dfClick[2] = CLICK_ACTION_MENU;
         dfClick[3] = CLICK_ACTION_ON_OFF;
 //	dfBatteryModel = 0;
 //	dfTCAlgo = TCALGO_DEF; // =0 
@@ -1444,6 +1457,10 @@ __myevic__ void InitDataFlash()
 				break;
 		}
 	}
+        else if ( ISPICO75 )
+        {
+                DisplayModel = 2;
+        }
 	else
 	{
 		DisplayModel = 0;
@@ -1602,7 +1619,7 @@ __myevic__ uint16_t GetShuntRezValue()
 				break;
 		}
         }
-        else if ( ISIKU200 )
+        else if ( ISIKU200 || ISPICO75 )
         {
                 rez = 102;
         }        

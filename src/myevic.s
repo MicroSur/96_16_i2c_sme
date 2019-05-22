@@ -77,7 +77,7 @@
 		.long TMR3_IRQHandler+1		@ 35 : Timer 3
 		.long Default_Handler+1		@ 36 : UART0
 		.long Default_Handler+1		@ 37 : UART1
-		.long Default_Handler+1		@ 38 : I2C0
+		.long I2C0_IRQHandler+1		@ 38 : I2C0
 		.long Default_Handler+1		@ 39 : I2C1
 		.long Default_Handler+1		@ 40 : Peripheral DMA
 		.long Default_Handler+1		@ 41 : DAC

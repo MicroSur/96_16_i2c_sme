@@ -12,6 +12,7 @@ uint8_t	DisplayCmdByte;
 const image_t **Images;
 
 uint8_t ScreenBuffer[SCREEN_BUFFER_SIZE] __attribute__((aligned(8)));
+uint8_t ScreenBuffer_96_16[SCREEN_BUFFER_SIZE_96_16] __attribute__((aligned(8)));
 
 const uint8_t ByteMaskRight[] = { 0x00, 0x01, 0x03,	0x07, 0x0F, 0x1F, 0x3F,	0x7F };
 const uint8_t ByteMaskLeft[]  = { 0xFF, 0xFE, 0xFC,	0xF8, 0xF0, 0xE0, 0xC0,	0x80 };
@@ -23,6 +24,72 @@ typedef void (PLOT_FUNC(int,int,int));
 
 PLOT_FUNC *DrawPoint;
 
+/*---------------------------------------------------------------------------------------------------------*/
+/* Global variables  i2c                                                                                      */
+/*---------------------------------------------------------------------------------------------------------*/
+volatile uint8_t g_u8DeviceAddr = 0x3C;
+uint8_t g_au8TxData[97];
+//volatile uint8_t g_u8RxData;
+volatile uint8_t g_u8DataIndex;
+volatile uint8_t g_u8DataLen;
+volatile uint8_t g_u8EndFlag = 0;
+
+typedef void (*I2C_FUNC)(uint32_t u32Status);
+static volatile I2C_FUNC s_I2C0HandlerFn = NULL;
+
+/*---------------------------------------------------------------------------------------------------------*/
+/*  I2C Tx Callback Function                                                                               */
+/*---------------------------------------------------------------------------------------------------------*/
+__myevic__ void I2C_MasterTx(uint32_t u32Status)
+{
+    if(u32Status == 0x08)                      //START has been transmitted
+    {
+        I2C_SET_DATA(I2C0, g_u8DeviceAddr << 1);    // Write SLA+W to Register I2CDAT
+        I2C_SET_CONTROL_REG(I2C0, I2C_CTL_SI);
+    }
+    else if(u32Status == 0x18)                  // SLA+W has been transmitted and ACK has been received
+    {
+        I2C_SET_DATA(I2C0, g_au8TxData[g_u8DataIndex++]);
+        I2C_SET_CONTROL_REG(I2C0, I2C_CTL_SI);
+    }
+    else if(u32Status == 0x20)                  // SLA+W has been transmitted and NACK has been received 
+    {
+        I2C_STOP(I2C0);
+        I2C_START(I2C0);
+    }
+    else if(u32Status == 0x28)                  // DATA has been transmitted and ACK has been received
+    {
+        if(g_u8DataIndex != g_u8DataLen )
+        {
+            I2C_SET_DATA(I2C0, g_au8TxData[g_u8DataIndex++]);
+            I2C_SET_CONTROL_REG(I2C0, I2C_CTL_SI);
+        }
+        else
+        {
+            I2C_SET_CONTROL_REG(I2C0, I2C_CTL_STO_SI);
+            g_u8EndFlag = 1;
+        }
+    }
+}
+
+__myevic__ void I2C0_IRQHandler(void)
+{
+    uint32_t u32Status;
+
+    u32Status = I2C_GET_STATUS(I2C0);
+    if(I2C_GET_TIMEOUT_FLAG(I2C0))
+    {
+        // Clear I2C0 Timeout Flag
+        I2C_ClearTimeoutFlag(I2C0);
+    }
+    else
+    {
+        if(s_I2C0HandlerFn != NULL)
+            s_I2C0HandlerFn(u32Status);
+    }
+    
+}
+
 
 //=========================================================================
 //----- (00006228) --------------------------------------------------------
@@ -33,6 +100,26 @@ __myevic__ void InitSPI0()
 
 	SPI_Open( SPI0, SPI_MASTER, SPI_MODE_0, 8, 4000000 );
 	SPI_EnableAutoSS( SPI0, SPI_SS, SPI_SS_ACTIVE_LOW );
+}
+
+__myevic__ void InitI2C()
+{
+        //SYS->GPA_MFPL &= ~(SYS_GPA_MFPL_PA2MFP_Msk|SYS_GPA_MFPL_PA3MFP_Msk);
+        //SYS->GPA_MFPL |= (SYS_GPA_MFPL_PA2MFP_I2C0_SDA|SYS_GPA_MFPL_PA3MFP_I2C0_SCL); //0x400 0x4000 = 0x4400
+
+    // Open I2C module and set bus clock
+    I2C_Open( I2C0, 100000 );
+    
+    // Set I2C 4 Slave Addresses
+    I2C_SetSlaveAddr(I2C0, 0, 0x15, 0);   /* Slave Address : 0x15 */
+    I2C_SetSlaveAddr(I2C0, 1, 0x35, 0);   /* Slave Address : 0x35 */
+    I2C_SetSlaveAddr(I2C0, 2, 0x55, 0);   /* Slave Address : 0x55 */
+    I2C_SetSlaveAddr(I2C0, 3, 0x75, 0);   /* Slave Address : 0x75 */
+
+    // Enable I2C interrupt
+    I2C_EnableInt(I2C0);
+    NVIC_EnableIRQ(I2C0_IRQn);
+
 }
 
 
@@ -51,6 +138,10 @@ __myevic__ void DisplaySendCommand( const uint8_t cmd )
 		case 1:
 			SSD1327_WriteBytes( 0, &DisplayCmdByte, 1 );
 			break;
+                        
+                case 2:                    
+			SSD1306_96_16_WriteBytes( 0, &DisplayCmdByte, 1 );
+			break;                        
 	}
 }
 
@@ -68,6 +159,10 @@ __myevic__ void DisplaySendData( const uint8_t *data, const uint32_t len )
 		case 1:
 			SSD1327_WriteBytes( 0x40, data, len );
 			break;
+
+                case 2:   
+			SSD1306_96_16_WriteBytes( 0x40, data, len );
+			break;                        
 	}
 }
 
@@ -79,6 +174,7 @@ __myevic__ void InitDisplay()
 	switch ( DisplayModel )
 	{
 		case 0:
+                case 2:
 			SSD1306_Init();
 			DrawPoint = SSD1306_Plot+1;
 			break;
@@ -105,6 +201,7 @@ __myevic__ void DisplaySetContrast( const uint8_t c )
 	switch ( DisplayModel )
 	{
 		case 0:
+                case 2:
 			SSD1306_SetContrast( c );
 			break;
 
@@ -120,6 +217,7 @@ __myevic__ void DisplaySetInverse( const uint8_t i )
 	switch ( DisplayModel )
 	{
 		case 0:
+                case 2:    
 			SSD1306_SetInverse( i );
 			break;
 
@@ -217,6 +315,7 @@ __myevic__ void ClearScreenBuffer()
 	switch ( DisplayModel )
 	{
 		case 0:
+                case 2:    
 			SSD1306_ClearBuffer();
 			break;
 
@@ -234,6 +333,7 @@ __myevic__ void ScreenOff()
 	switch ( DisplayModel )
 	{
 		case 0:
+                case 2:
 			SSD1306_ScreenOff();
 			break;
 
@@ -251,6 +351,7 @@ __myevic__ void DisplayRefresh()
 	switch ( DisplayModel )
 	{
 		case 0:
+                case 2:                    
 			SSD1306_Refresh();
 			break;
 
@@ -393,6 +494,7 @@ __myevic__ uint32_t DrawImage( const int x, const int y, const uint8_t img )
 	switch ( DisplayModel )
 	{
 		case 0:
+                case 2:
 			return SSD1306_Image( x, y, img, 0 );
 
 		case 1:
@@ -408,6 +510,7 @@ __myevic__ uint32_t DrawImageRight( const int x, const int y, const uint8_t img 
 	switch ( DisplayModel )
 	{
 		case 0:
+                case 2:                    
 			return SSD1306_Image( x - Images[img - 1]->width, y, img, 0 );
 
 		case 1:
@@ -444,6 +547,7 @@ __myevic__ uint32_t DrawImageInv( const int x, const int y, const uint8_t img )
 	switch ( DisplayModel )
 	{
 		case 0:
+                case 2:                    
 			return SSD1306_Image( x, y, img, 1 );
 
 		case 1:
@@ -497,6 +601,10 @@ __myevic__ void DrawLOGO( const int x, const int y )
 
 			case 1:
 				SSD1327_Bitmap( x, y, img, 0 );
+				break;
+                                
+                        case 2:       
+                                SSD1306_96_16_Bitmap( x, y, img, 0 );
 				break;
 		}
 	//}
@@ -780,29 +888,59 @@ __myevic__ void Screen2Bitmap( uint8_t *pu8Bitmap )
 		case 1:
 			SSD1327_Screen2Bitmap( pu8Bitmap );
 			break;
+                        
+		case 2:
+			SSD1306_96_16_Screen2Bitmap( pu8Bitmap );
+			break;                        
 	}
 }
 
 
-//=========================================================================
-// Set the font
-//-------------------------------------------------------------------------
-/*
-__myevic__ void DisplaySetFont()
-{
-	//if ( dfStatus.font )
-	//{
-		Images = font0_1306;
-
-//	}
-//	else
-//	{
-//		Images = font1_1306;
-//	}
-}
-*/
-
 __myevic__ void DrawPixel (int x, int y, int color)
 {
 	DrawPoint( x, y, color );
+}
+
+
+/*
+void I2C0_Close(void)
+{
+    // Disable I2C0 interrupt and clear corresponding NVIC bit
+    I2C_DisableInt(I2C0);
+    NVIC_DisableIRQ(I2C0_IRQn);
+
+    // Disable I2C0 and close I2C0 clock
+    I2C_Close(I2C0);
+    CLK_DisableModuleClock(I2C0_MODULE);
+
+}
+*/
+
+
+__myevic__ void SSD1306_96_16_WriteBytes( const int isData, const uint8_t data[], const int len )
+{
+
+        g_au8TxData[0] = isData;
+        MemCpy( &g_au8TxData[1], data, len );
+            
+	g_u8DataIndex = 0;
+        g_u8EndFlag = 0;
+        g_u8DataLen = len+1;
+        
+        // I2C function to write data to slave
+        s_I2C0HandlerFn = (I2C_FUNC)I2C_MasterTx;
+
+        // I2C as master sends START signal
+        I2C_SET_CONTROL_REG(I2C0, I2C_CTL_STA);
+        
+	// Wait I2C Tx Finish 
+        while(g_u8EndFlag == 0);
+   
+        g_u8EndFlag = 0;
+        
+        s_I2C0HandlerFn = NULL;
+
+
+    // Close I2C0
+    //I2C0_Close();      
 }

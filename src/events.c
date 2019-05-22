@@ -7,8 +7,6 @@
 #include "dataflash.h"
 #include "atomizer.h"
 #include "battery.h"
-#include "flappy.h"
-#include "tetris.h"
 #include "timers.h"
 #include "meusbd.h"
 
@@ -182,7 +180,15 @@ __myevic__ void KeyRepeat()
 		{
 			Event = dfStatus2.swap_mp ? 2: 3;
 		}
-	}
+                
+                if ( ISPICO75 )
+                {
+                    if ( Event == 2 )
+                        Event = 3;
+                    else if ( Event == 3 )
+                        Event = 2;
+                }
+        }
 }
 
 __myevic__ void SetClicksAction( uint8_t num )
@@ -219,14 +225,6 @@ __myevic__ void SetClicksAction( uint8_t num )
         case CLICK_ACTION_PROFILE:
             //sur do not like EVENT_NEXT_PROFILE;
             FireClicksEvent = EVENT_PROFILE_MENU;
-            break;
-                                                        
-        case CLICK_ACTION_TETRIS:
-            FireClicksEvent = EVENT_TETRIS; // tetris
-            break;
-                                                        
-        case CLICK_ACTION_GAME:
-            FireClicksEvent = 41;	// flappy
             break;
                                                         
         case CLICK_ACTION_SAVER:
@@ -320,11 +318,11 @@ __myevic__ void GetUserInput()
                 //! means pressed
 		if ( !PD2 && PE0 && PD3 ) 
                 {
-                    UserInputs = 2;
+                    UserInputs = ( ISPICO75 ) ? 3 : 2;
                 }
                 else if ( !PD3 && PE0 && PD2 ) 
                 {
-                    UserInputs = 3;
+                    UserInputs = ( ISPICO75 ) ? 2 : 3;
                 }
 		else if ( !PD2 && !PD3 && PE0 ) 
                 {
@@ -332,11 +330,11 @@ __myevic__ void GetUserInput()
                 }
 		else if ( !PE0 && !PD2 && PD3 ) 
                 {
-                    UserInputs = 5;
+                    UserInputs = ( ISPICO75 ) ? 6 : 5;
                 }
 		else if ( !PE0 && !PD3 && PD2 ) 
                 {
-                    UserInputs = 6;
+                    UserInputs = ( ISPICO75 ) ? 5 : 6;
                 }
                 else if ( !PE0 && !PD3 && !PD2 )
                 {
@@ -632,28 +630,9 @@ __myevic__ void GetUserInput()
 			}
 			else if ( !dfStatus.off )
 			{
-				if ( !gFlags.playing_fb && !gFlags.playing_tt)
-				{
 					Event = EVENT_ENTER_MENUS;
-				}
-				else
-				{
-                                    Event = 0;
-                                    if ( gFlags.playing_fb )
-                                    {
-					gFlags.playing_fb = 0;					
-					fbInitTimeouts();
-                                    }
-                                    else if ( gFlags.playing_tt )
-                                    {
-					gFlags.playing_tt = 0;
-					ttInitTimeouts();
-                                    }
-                                    MainView();
-
-				}                                
 			}
-                }
+		}                                
                 else if ( UserInputs == 7 ) //all 3 buttons
                 {
                     if ( !dfStatus.off && ( Screen == 1 || Screen == 0 ) )  //( !dfStatus.off && !IsMenuScreen() )
@@ -1761,21 +1740,7 @@ __myevic__ int CustomEvents()
 			EditItemIndex = 0;
 			break;
 */
-                        
-                case 41:
-			//fbStartGame();
-                        CurrentMenu = &GameMenu; 
-                        CurrentMenuItem = FBSpeed;
-                        SetScreen( 102, 15 );                        
-			break;
-                        
-                case EVENT_TETRIS:
- 			//ttStartGame();
-                        CurrentMenu = &GameTtMenu; 
-                        CurrentMenuItem = dfTTSpeed;
-                        SetScreen( 102, 15 );
-			break;
-                        
+                                                                      
                 case EVENT_SAVER:
                         gFlags.animready = 0;
                         SetScreen( 60, GetScreenProtection() );

@@ -74,7 +74,8 @@ enum
         BOX_RX217,
         BOX_GEN2,
         BOX_IKU200,
-        BOX_FIT
+        BOX_FIT,
+        BOX_PICO75
 };
 
 #define ISVTCMINI		(BoxModel==BOX_VTCMINI)
@@ -108,6 +109,7 @@ enum
 #define ISGEN2                  (BoxModel==BOX_GEN2)
 #define ISIKU200                (BoxModel==BOX_IKU200)
 #define ISFIT                   (BoxModel==BOX_FIT)
+#define ISPICO75                (BoxModel==BOX_PICO75)
 
 //=========================================================================
 // Global flags bitfield

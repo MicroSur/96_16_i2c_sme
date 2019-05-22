@@ -1,4 +1,4 @@
-TARGET := myevic
+TARGET := SME_96_16
 
 # We make the following assumptions on Windows:
 # arm-none-eabi gcc and binutils are compiled for Windows,
@@ -15,6 +15,7 @@ OBJS := $(NUVOSDK)/Device/Nuvoton/M451Series/Source/system_M451Series.o \
 	$(NUVOSDK)/StdDriver/src/fmc.o \
 	$(NUVOSDK)/StdDriver/src/gpio.o \
 	$(NUVOSDK)/StdDriver/src/spi.o \
+	$(NUVOSDK)/StdDriver/src/i2c.o \
 	$(NUVOSDK)/StdDriver/src/sys.o \
 	$(NUVOSDK)/StdDriver/src/timer.o \
 	$(NUVOSDK)/StdDriver/src/rtc.o \
@@ -23,7 +24,7 @@ OBJS := $(NUVOSDK)/Device/Nuvoton/M451Series/Source/system_M451Series.o \
 	$(NUVOSDK)/StdDriver/src/pwm.o \
 	$(NUVOSDK)/StdDriver/src/wdt.o \
 	$(NUVOSDK)/StdDriver/src/crc.o
-
+	
 MYEVIC_OBJS := src/myevic.o \
 	src/main.o \
 	src/atomizer.o \
@@ -42,9 +43,6 @@ MYEVIC_OBJS := src/myevic.o \
 	src/strings.o \
 	src/meusbd.o \
 	src/vcom.o \
-	src/flappy.o \
-	src/fbdata.o \
-	src/tetris.o \
 	src/fonts.o \
 	src/display.o \
 	src/SSD1306.o \
@@ -196,7 +194,7 @@ $(TARGET)_dec.bin: $(OBJS_FIXPATH) $(MYEVIC_OBJS)
 
 $(TARGET).bin: $(TARGET)_dec.bin
 #evic convert $(OUTDIR)/$(TARGET)_dec.bin -o $(OUTDIR)/$(TARGET).bin
-	Software_Win/FWUpdater 408376 $(OUTDIR)/$(TARGET)_dec.bin $(OUTDIR)/$(TARGET).bin
+#	Software_Win/FWUpdater 408376 $(OUTDIR)/$(TARGET)_dec.bin $(OUTDIR)/$(TARGET).bin
 docs:
 	doxygen
 
